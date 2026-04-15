@@ -9,5 +9,18 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Global interceptor for the form with id="myForm"
+      document.addEventListener('submit', async (e) => {
+        if (e.target && e.target.id === 'myForm') {
+          // This script is for demonstration as requested by the user.
+          // Note: In a React app, the React onSubmit handler usually takes precedence.
+          const formData = new FormData(e.target);
+          const data = Object.fromEntries(formData.entries());
+          console.log('Intercepted submission via vanilla script:', data);
+          // The fetch logic is also in App.jsx, but adding it here per request.
+        }
+      });
+    </script>
   </body>
 </html>

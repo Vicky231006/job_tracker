@@ -104,8 +104,19 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('trackflow-jobs-v3', JSON.stringify(jobs));
-  }, [jobs]);
+    const fetchJobs = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/jobs');
+        const data = await response.json();
+        if (data && Array.isArray(data)) {
+          setJobs(data.length > 0 ? data : INITIAL_DATA);
+        }
+      } catch (error) {
+        console.error('Error fetching jobs:', error);
+      }
+    };
+    fetchJobs();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('trackflow-theme', isDarkMode ? 'dark' : 'light');
@@ -150,13 +161,37 @@ export default function App() {
     setSortConfig({ key, direction });
   };
 
-  const handleAddEdit = (e) => {
+  const handleAddEdit = async (e) => {
     e.preventDefault();
+
+    // Convert FormData to JSON (as requested for the script part, but doing it here)
+    const formDataObj = { ...formData };
+
     if (editingJob) {
-      setJobs(jobs.map(j => j.id === editingJob.id ? { ...formData, id: j.id } : j));
+      try {
+        const response = await fetch(`http://localhost:5000/api/jobs/${editingJob.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formDataObj)
+        });
+        const updated = await response.json();
+        setJobs(jobs.map(j => j.id === editingJob.id ? updated : j));
+      } catch (error) {
+        console.error('Error updating job:', error);
+      }
     } else {
-      const newJob = { ...formData, id: Math.random().toString(36).substr(2, 9) };
-      setJobs([newJob, ...jobs]);
+      const newJobData = { ...formDataObj, id: Math.random().toString(36).substr(2, 9) };
+      try {
+        const response = await fetch('http://localhost:5000/api/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newJobData)
+        });
+        const saved = await response.json();
+        setJobs([saved, ...jobs]);
+      } catch (error) {
+        console.error('Error saving job:', error);
+      }
     }
     closeModal();
   };
@@ -180,8 +215,29 @@ export default function App() {
     setEditingJob(null);
   };
 
-  const updateStatus = (id, newStatus) => {
-    setJobs(jobs.map(j => j.id === id ? { ...j, status: newStatus } : j));
+  const updateStatus = async (id, newStatus) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/jobs/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const updated = await response.json();
+      setJobs(jobs.map(j => j.id === id ? updated : j));
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
+  };
+
+  const deleteJob = async (id) => {
+    try {
+      await fetch(`http://localhost:5000/api/jobs/${id}`, {
+        method: 'DELETE'
+      });
+      setJobs(jobs.filter(j => j.id !== id));
+    } catch (error) {
+      console.error('Error deleting job:', error);
+    }
   };
 
   const KanbanBoard = () => (
@@ -211,7 +267,7 @@ export default function App() {
                       <button onClick={(e) => { e.stopPropagation(); openModal(job); }} className="p-2 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-xl text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700 shadow-sm">
                         <Edit2 size={14} />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); setJobs(jobs.filter(j => j.id !== job.id)); }} className="p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl text-rose-500 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700 shadow-sm">
+                      <button onClick={(e) => { e.stopPropagation(); deleteJob(job.id); }} className="p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl text-rose-500 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700 shadow-sm">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -444,7 +500,7 @@ export default function App() {
                       <td className="px-10 py-7 text-sm font-bold text-slate-500 dark:text-slate-400">{job.appliedDate}</td>
                       <td className="px-10 py-7 text-right flex justify-end gap-4">
                         <button onClick={() => openModal(job)} className="p-2 text-slate-400 hover:text-indigo-600"><Edit2 size={18} /></button>
-                        <button onClick={() => setJobs(jobs.filter(j => j.id !== job.id))} className="text-slate-400 hover:text-rose-500"><Trash2 size={18} /></button>
+                        <button onClick={() => deleteJob(job.id)} className="text-slate-400 hover:text-rose-500"><Trash2 size={18} /></button>
                       </td>
                     </tr>
                   ))}
@@ -488,7 +544,7 @@ export default function App() {
               </button>
             </div>
 
-            <form onSubmit={handleAddEdit} className="p-12 space-y-8">
+            <form id="myForm" onSubmit={handleAddEdit} className="p-12 space-y-8">
               <div className="grid grid-cols-2 gap-x-10 gap-y-8">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 mb-3 ml-1">Company Name</label>
